@@ -3,28 +3,19 @@
 cable = "back"
 
 -- in
-signal_red2 = colors.red
-signal_green2 = colors.green
+signal_red2 = { colors.red, colors.magenta, colors.orange }
+signal_green2 = { colors.green, colors.cyan, colors.yellow }
 
 -- out
 signal_green1 = colors.lime
-signal_track2 = colors.gray
-signal_light2 = colors.lightGray
+signal_red1 = colors.lightGray
+signal_switch2 = { colors.blue, colors.lightBlue }
 
 -- end config
 
--- false = red, true = green
-state_signal = false
-
-initialize = true
-
-state_red2 = false
-state_green2 = false
-
-debug = false
-debug_lines = 0
-
--- end vars
+state_red = { false, false, false }
+state_green2 = { false, false, false }
+state_switch2 = { false, false }
 
 local function debugPrint(text, ... )
 	if not debug then
@@ -84,9 +75,8 @@ local function updateState()
 			debugPrint("Switching Signal to Red")
 		end
 		
-		-- set state of lockdown track
-		setBundledState(cable, signal_track2, state_signal)
-		setBundledState(cable, signal_light2, not state_signal)
+		-- send light signal to previous block
+		setBundledState(cable, signal_red1, not state_signal)
 		
 		-- send block state to previous block
 		if state_signal then
@@ -94,16 +84,6 @@ local function updateState()
 			sleep(0.1)
 			setBundledState(cable, signal_green1, false)
 		end
-	end
-end
-
-local function printState()
-	term.setCursorPos(1, 4)
-	
-	if state_signal then
-		print("State:  Green")
-	else
-		print("State:  Red  ")
 	end
 end
 
@@ -115,12 +95,8 @@ rs.setBundledOutput(cable, 0)
 -- reset terminal
 term.clear()
 
--- initial print
-updateState()
-printState()
-
 while true do
-	printHeader()
+	--printHeader()
 
 	local event, param = os.pullEvent()
 	
@@ -131,46 +107,46 @@ while true do
 			print("Program terminated.")
 			break
 		end
-		if string.lower(param) == "d" then
-			debug = not debug
-			clearDebug()
-			debugPrint("Debug State: ", debug)
-		end
 	end
 	
 	state_signal_old = state_signal
 	
+	local state = rs.getBundledInput(cable)
+	
 	if event == "redstone" then
 		local state = rs.getBundledInput(cable)
-
+		
 		-- directly set red
-		if colors.test(state, signal_red2) then
-			if not state_red2 then
-				debugPrint("Raising Red ...")
-				state_red2 = true
+		for i=1,#signal_red do
+			if colors.test(state, signal_red2[i]) then
+				if not state_red2[i] then
+					debugPrint("Raising Red #", i, " ...")
+					state_red2[i] = true
+				end
+				state_signal = false
+			else
+				state_red2[i] = false
 			end
-			state_signal = false
-		else
-			state_red2 = false
 		end
 		
-		-- react on falling edge
-		if colors.test(state, signal_green2) then
-			if not state_green2 then
-				debugPrint("Raising Green ...")
-				state_green2 = true
+		for i=1,#signal_green do
+			-- react on falling edge
+			if colors.test(state, signal_green2[i]) then
+				if not state_green2[i] then
+					debugPrint("Raising Green #", i, " ...")
+					state_green2[i] = true
+				end
+			else
+				if state_green2[i] then
+					debugPrint("Falling Green #", i, " ...")
+					-- state_signal = true
+				end
+				state_green2[i] = false
 			end
-		else
-			if state_green2 then
-				debugPrint("Falling Green ...")
-				state_signal = true
-			end
-			state_green2 = false
 		end
+		
+		-- os.startTimer event == timer
 	end
-
-	updateState()
-	printState()
 end
 
 -- reset cable on exit
