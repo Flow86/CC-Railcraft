@@ -1,0 +1,2 @@
+shell.setDir("railcraft")
+shell.run("signalblock")

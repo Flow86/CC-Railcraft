@@ -17,3 +17,7 @@ if fs.isDir('/rom/autorun') then
 		end
 	end
 end
+
+if fs.exists("startup."..tostring(os.getComputerID())) then
+	shell.run("startup."..tostring(os.getComputerID()))
+end

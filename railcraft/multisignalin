@@ -21,7 +21,7 @@ cable_input =  { "left", "back", "right", "front" }
 cable_output = { "left", "back", "right", "front" }
 
 -- in
-cable_input_red2   = { colors.red,  colors.red,  colors.red, }
+cable_input_red2   = { colors.magenta,  colors.magenta,  colors.magenta, }
 cable_input_green2 = { colors.lime, colors.lime, colors.lime }
 cable_input_green3 = colors.yellow
 
@@ -46,13 +46,13 @@ cable_state_red1   = true
 cable_pulse_green1 = false
 
 local function saveState()
-	f = fs.open("signal.state", "w")
+	f = fs.open("/signal"..tostring(os.getComputerID())..".state", "w")
 	--f.write(state_signal)
 	f.close()
 end
 
 local function restoreState()
-	f = fs.open("signal.state", "r")
+	f = fs.open("/signal"..tostring(os.getComputerID())..".state", "r")
 	if f ~= nil then
 		--state_signal = f.readAll()
 		f.close()
@@ -76,7 +76,7 @@ local function printHeader()
 	local w, h = term.getSize()
 	
 	term.setCursorPos(1,1)
-	print("Multi Block Processor")
+	print("Multi Block Processor #", os.getComputerID())
 	
 	term.setCursorPos(1, h-1)
 	print("=== Press Q to terminate. ===")
@@ -96,7 +96,6 @@ local function updateState()
 			cable_pulse_green3[i] = false
 			pulseBundledState(cable_output[i], cable_output_green3[i], true)
 		end
-		
 	end
 
 	-- send red to previous block
@@ -132,7 +131,9 @@ setDebug("top", 1)
 enableDebug()
 
 -- reset cable
-rs.setBundledOutput(cable_output, 0)
+for i=1,#cable_output do
+	rs.setBundledOutput(cable_output[i], 0)
+end
 
 -- initial print
 restoreState()
@@ -173,6 +174,7 @@ while true do
 				used, usedp = calculateUsed()
 				if used == 0 then
 					cable_state_red1 = true
+				end
 				
 				-- instantly activate switch-track
 				cable_state_switch2[i] = true
@@ -231,7 +233,6 @@ while true do
 				end
 			end
 		end
-		
 	end
 	
 	updateState()
@@ -239,6 +240,8 @@ while true do
 end
 
 -- reset cable on exit
-rs.setBundledOutput(cable_output, 0)
+for i=1,#cable_output do
+	rs.setBundledOutput(cable_output[i], 0)
+end
 
 -- eof

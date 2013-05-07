@@ -35,15 +35,18 @@ raise_state_green2 = false
 -- end vars
 
 local function saveState()
-	f = fs.open("signal.state", "w")
-	f.write(signal_state)
-	f.close()
+	f = fs.open("/signal-"..tostring(os.getComputerID())..".state", "w")
+	debugPrint(f)
+	if f ~= nil then
+		f.write(state_signal)
+		f.close()
+	end
 end
 
 local function restoreState()
-	f = fs.open("signal.state", "r")
+	f = fs.open("/signal-"..tostring(os.getComputerID())..".state", "r")
 	if f ~= nil then
-		signal_state = f.readAll()
+		state_signal = f.readAll()
 		f.close()
 	end
 end
@@ -52,7 +55,7 @@ local function printHeader()
 	local w, h = term.getSize()
 	
 	term.setCursorPos(1,1)
-	print("Signal Block Processor (I:", cable_input, ", O:", cable_output, ")")
+	print("Signal Block Processor #", os.getComputerID(), " (I:", cable_input, ", O:", cable_output, ")")
 	
 	term.setCursorPos(1, h-1)
 	print("=== Press Q to terminate. ===")
