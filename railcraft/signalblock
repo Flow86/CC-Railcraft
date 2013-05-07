@@ -21,42 +21,13 @@ initialize = true
 state_red2 = false
 state_green2 = false
 
-debug = false
-debug_lines = 0
-
 -- end vars
 
-local function debugPrint(text, ... )
-	if not debug then
-		return
-	end
+-- reset terminal
+term.clear()
 
-	term.setCursorPos(1, 6+debug_lines)
-	print(text, ...)
-	term.clearLine(debug_lines + 1)
-	
-	local w, h = term.getSize()
-	debug_lines = (debug_lines + 1) % (h-6)
-end
-
-local function clearDebug()
-	local w, h = term.getSize()
-	for i=6,h-6 do
-		term.clearLine(i)
-	end
-end
-
-local function setBundledState(cable, color, state)
-	local oldcolor = rs.getBundledOutput(cable)
-
-	if state then
-		oldcolor = colors.combine(oldcolor, color)
-	else
-		oldcolor = colors.subtract(oldcolor, color)
-	end
-
-	rs.setBundledOutput(cable, oldcolor)
-end
+shell.run('debug.lua')
+shell.run('bundle.lua')
 
 local function printHeader()
 	local w, h = term.getSize()
@@ -75,7 +46,7 @@ end
 
 local function updateState()
 	-- set signal state
-	if initialize or state_signal_old == not state_signal then
+	if initialize or state_signal_old ~= state_signal then
 		initialize = false
 		
 		if state_signal then
@@ -112,8 +83,7 @@ end
 -- reset cable
 rs.setBundledOutput(cable, 0)
 
--- reset terminal
-term.clear()
+setDebug(nil, 6)
 
 -- initial print
 updateState()
@@ -132,9 +102,7 @@ while true do
 			break
 		end
 		if string.lower(param) == "d" then
-			debug = not debug
-			clearDebug()
-			debugPrint("Debug State: ", debug)
+			toggleDebug()
 		end
 	end
 	

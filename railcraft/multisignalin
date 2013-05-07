@@ -13,47 +13,25 @@ signal_switch2 = { colors.blue, colors.lightBlue }
 
 -- end config
 
-state_red = { false, false, false }
+raise_red2 = { false, false, false }
+state_red2 = { false, false, false }
+raise_green2 = { false, false, false }
 state_green2 = { false, false, false }
-state_switch2 = { false, false }
+state_switch2 = { false, false, false }
 
-local function debugPrint(text, ... )
-	if not debug then
-		return
-	end
+initialize = true
 
-	term.setCursorPos(1, 6+debug_lines)
-	print(text, ...)
-	term.clearLine(debug_lines + 1)
-	
-	local w, h = term.getSize()
-	debug_lines = (debug_lines + 1) % (h-6)
-end
+-- reset terminal
+term.clear()
 
-local function clearDebug()
-	local w, h = term.getSize()
-	for i=6,h-6 do
-		term.clearLine(i)
-	end
-end
-
-local function setBundledState(cable, color, state)
-	local oldcolor = rs.getBundledOutput(cable)
-
-	if state then
-		oldcolor = colors.combine(oldcolor, color)
-	else
-		oldcolor = colors.subtract(oldcolor, color)
-	end
-
-	rs.setBundledOutput(cable, oldcolor)
-end
+shell.run('debug.lua')
+shell.run('bundle.lua')
 
 local function printHeader()
 	local w, h = term.getSize()
 	
 	term.setCursorPos(1,1)
-	print("Signal Block Processor")
+	print("Multi Block Processor (Front)")
 	
 	term.setCursorPos(1,3)
 	print("Config: Cable at ", cable)
@@ -65,14 +43,44 @@ local function printHeader()
 end
 
 local function updateState()
+	-- if we have one green signal, one train can pass
+	local free = 0
+	
+	for i=1,#signal_green2 do
+		if state_green2[i] then
+			debugPrint("Signal", i, " switch Green: ", tostring(state_signal_old))
+			state_signal = true
+			state_switch2[i] = false
+			free = free + 1
+		end
+	end
+
+	debugPrint("Free: ", free)
+	
+	for i=1,#signal_red2 do
+		if state_red2[i] then
+			state_switch2[i] = true
+		end
+	end
+	
+	-- set switch track state
+	for i=1,#signal_switch2 do
+		setBundledState(cable, signal_switch2[i], state_switch2[i])
+	end
+	
+	-- force green
+	--if free > 0 and state_signal_old == state_signal then
+	--	state_signal_old = not state_signal
+	--end
+
 	-- set signal state
-	if initialize or state_signal_old == not state_signal then
+	if initialize or state_signal_old ~= state_signal then
 		initialize = false
 		
 		if state_signal then
-			debugPrint("Switching Signal to Green")
+			debugPrint("Switching Entry to Green")
 		else
-			debugPrint("Switching Signal to Red")
+			debugPrint("Switching Entry to Red")
 		end
 		
 		-- send light signal to previous block
@@ -87,16 +95,36 @@ local function updateState()
 	end
 end
 
+local function printState()
+	term.setCursorPos(1, 4)
+	
+	if state_signal then
+		print("State:  Green")
+	else
+		print("State:  Red  ")
+	end
+	
+	term.clearLine(5)
+	print("Red:    ", tostring(state_red2[1]), " ", tostring(state_red2[2]), " ", tostring(state_red2[3]))
+	term.clearLine(6)
+	print("Green:  ", tostring(state_green2[1]), " ", tostring(state_green2[2]), " ", tostring(state_green2[3]))
+	term.clearLine(7)
+	print("Switch: ", tostring(state_switch2[1]), " ", tostring(state_switch2[2]))
+end
 -- end functions
 
 -- reset cable
 rs.setBundledOutput(cable, 0)
 
--- reset terminal
-term.clear()
+setDebug("top", 1)
+enableDebug()
+
+-- initial print
+updateState()
+printState()
 
 while true do
-	--printHeader()
+	printHeader()
 
 	local event, param = os.pullEvent()
 	
@@ -106,6 +134,9 @@ while true do
 			term.setCursorPos(1, 1)
 			print("Program terminated.")
 			break
+		end
+		if string.lower(param) == "d" then
+			toggleDebug()
 		end
 	end
 	
@@ -117,36 +148,46 @@ while true do
 		local state = rs.getBundledInput(cable)
 		
 		-- directly set red
-		for i=1,#signal_red do
+		for i=1,#signal_red2 do
 			if colors.test(state, signal_red2[i]) then
-				if not state_red2[i] then
+				if not raise_red2[i] then
 					debugPrint("Raising Red #", i, " ...")
+					raise_red2[i] = true
 					state_red2[i] = true
+					state_signal = false
 				end
-				state_signal = false
+				state_green2[i] = false
 			else
-				state_red2[i] = false
+				if raise_red2[i] then
+					debugPrint("Falling Red #", i, " ...")
+					state_red2[i] = false
+				end
+				raise_red2[i] = false
 			end
 		end
 		
-		for i=1,#signal_green do
+		for i=1,#signal_green2 do
 			-- react on falling edge
 			if colors.test(state, signal_green2[i]) then
-				if not state_green2[i] then
+				if not raise_green2[i] then
 					debugPrint("Raising Green #", i, " ...")
-					state_green2[i] = true
+					raise_green2[i] = true
 				end
 			else
-				if state_green2[i] then
+				if raise_green2[i] then
 					debugPrint("Falling Green #", i, " ...")
-					-- state_signal = true
+					state_green2[i] = true
 				end
-				state_green2[i] = false
+				raise_green2[i] = false
 			end
 		end
 		
 		-- os.startTimer event == timer
 	end
+	
+	updateState()
+	printState()
+	
 end
 
 -- reset cable on exit
