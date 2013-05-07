@@ -17,14 +17,15 @@ function setDebug(s, y)
 	debug_ystart = y
 
 	if side ~= nil then
-		if peripheral.getType( side ) ~= "monitor" then
+		if peripheral.getType( side ) == "monitor" then
+			monitor = peripheral.wrap( side )
+			term.redirect( monitor )
+			term.clear()
+			term.restore()
+		else
 			print( "No monitor on "..side.." side" )
-			x()
+			monitor = nil
 		end
-		monitor = peripheral.wrap( side )
-		term.redirect( monitor )
-		term.clear()
-		term.restore()
 	else
 		monitor = nil
 	end
