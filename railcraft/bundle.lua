@@ -13,3 +13,9 @@ function setBundledState(cable, color, state)
 
 	rs.setBundledOutput(cable, oldcolor)
 end
+
+function pulseBundledState(cable, color, state)
+	setBundledState(cable, color, state)
+	sleep(0.1)
+	setBundledState(cable, color, not state)
+end

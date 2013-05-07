@@ -1,27 +1,89 @@
 -- being config
 
-cable = "back"
+cable_input = "front"
+cable_output = "front"
 
 -- in
-signal_red2 = colors.red
-signal_green2 = colors.green
+cable_input_red2 = colors.red
+cable_input_green2 = colors.green
 
 -- out
-signal_green1 = colors.lime
-signal_track2 = colors.gray
-signal_light2 = colors.lightGray
+cable_output_green1 = colors.lime
+cable_output_track2 = colors.gray
+cable_output_light2 = colors.lightGray
 
 -- end config
 
 -- false = red, true = green
 state_signal = false
+state_signal_old = nil
 
-initialize = true
-
-state_red2 = false
-state_green2 = false
+raise_state_red2 = false
+raise_state_green2 = false
 
 -- end vars
+
+local function saveState()
+	f = fs.open("signal.state", "w")
+	f.write(signal_state)
+	f.close()
+end
+
+local function restoreState()
+	f = fs.open("signal.state", "r")
+	if f ~= nil then
+		signal_state = f.readAll()
+		f.close()
+	end
+end
+
+local function printHeader()
+	local w, h = term.getSize()
+	
+	term.setCursorPos(1,1)
+	print("Signal Block Processor (I:", cable_input, ", O:", cable_output, ")")
+	
+	term.setCursorPos(1, h-1)
+	print("=== Press Q to terminate. ===")
+
+	term.setCursorPos(1, 4)
+end
+
+local function updateState()
+
+	-- set signal state
+	if state_signal_old == nil or state_signal_old ~= state_signal then
+		saveState()
+		if state_signal then
+			debugPrint("Switching Signal to Green")
+		else
+			debugPrint("Switching Signal to Red")
+		end
+		
+		-- set state of lockdown track and light
+		setBundledState(cable_output, cable_output_track2, state_signal)
+		setBundledState(cable_output, cable_output_light2, not state_signal)
+		
+		-- send block state to previous block
+		if state_signal then
+			pulseBundledState(cable_output, cable_output_green1, true)
+		end
+	end
+	
+	state_signal_old = state_signal
+end
+
+local function printState()
+	term.setCursorPos(1, 2)
+	
+	if state_signal then
+		print("Signal State:  Green")
+	else
+		print("Signal State:  Red  ")
+	end
+end
+
+-- end functions
 
 -- reset terminal
 term.clear()
@@ -29,63 +91,13 @@ term.clear()
 shell.run('debug.lua')
 shell.run('bundle.lua')
 
-local function printHeader()
-	local w, h = term.getSize()
-	
-	term.setCursorPos(1,1)
-	print("Signal Block Processor")
-	
-	term.setCursorPos(1,3)
-	print("Config: Cable at ", cable)
-
-	term.setCursorPos(1, h-1)
-	print("=== Press Q to terminate. ===")
-
-	term.setCursorPos(1, 6)
-end
-
-local function updateState()
-	-- set signal state
-	if initialize or state_signal_old ~= state_signal then
-		initialize = false
-		
-		if state_signal then
-			debugPrint("Switching Signal to Green")
-		else
-			debugPrint("Switching Signal to Red")
-		end
-		
-		-- set state of lockdown track
-		setBundledState(cable, signal_track2, state_signal)
-		setBundledState(cable, signal_light2, not state_signal)
-		
-		-- send block state to previous block
-		if state_signal then
-			setBundledState(cable, signal_green1, true)
-			sleep(0.1)
-			setBundledState(cable, signal_green1, false)
-		end
-	end
-end
-
-local function printState()
-	term.setCursorPos(1, 4)
-	
-	if state_signal then
-		print("State:  Green")
-	else
-		print("State:  Red  ")
-	end
-end
-
--- end functions
+setDebug(nil, 4)
 
 -- reset cable
-rs.setBundledOutput(cable, 0)
-
-setDebug(nil, 6)
+rs.setBundledOutput(cable_output, 0)
 
 -- initial print
+restoreState()
 updateState()
 printState()
 
@@ -98,7 +110,6 @@ while true do
 		if string.lower(param) == "q" then
 			term.clear()
 			term.setCursorPos(1, 1)
-			print("Program terminated.")
 			break
 		end
 		if string.lower(param) == "d" then
@@ -106,34 +117,37 @@ while true do
 		end
 	end
 	
-	state_signal_old = state_signal
-	
 	if event == "redstone" then
-		local state = rs.getBundledInput(cable)
+		local input_state = rs.getBundledInput(cable_input)
 
-		-- directly set red
-		if colors.test(state, signal_red2) then
-			if not state_red2 then
+		if colors.test(input_state, cable_input_red2) then
+			if not raise_state_red2 then
 				debugPrint("Raising Red ...")
-				state_red2 = true
+				raise_state_red2 = true
 			end
+			-- react on active cable
 			state_signal = false
 		else
-			state_red2 = false
+			if raise_state_red2 then
+				debugPrint("Falling Red ...")
+				raise_state_red2 = false
+			end
 		end
 		
 		-- react on falling edge
-		if colors.test(state, signal_green2) then
-			if not state_green2 then
+		if colors.test(input_state, cable_input_green2) then
+			if not raise_state_green2 then
 				debugPrint("Raising Green ...")
-				state_green2 = true
+				raise_state_green2 = true
 			end
 		else
-			if state_green2 then
+			if raise_state_green2 then
 				debugPrint("Falling Green ...")
+				raise_state_green2 = false
+				
+				-- react on falling edge (toggle cable off)
 				state_signal = true
 			end
-			state_green2 = false
 		end
 	end
 
@@ -142,6 +156,6 @@ while true do
 end
 
 -- reset cable on exit
-rs.setBundledOutput(cable, 0)
+rs.setBundledOutput(cable_output, 0)
 
 -- eof
