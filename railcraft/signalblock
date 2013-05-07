@@ -1,10 +1,21 @@
--- being config
+--
+-- plug bundled cable in
+--
+-- front:
+--   next block "lime" -> green
+--   post-detector -> red 
+--   gray -> lockdown track
+--   lightGray -> Controller-Box paired to Distant Signal
+--   lime -> previous block "green"
+--
 
-cable_input = "front"
+-- config
+
+cable_input  = "front"
 cable_output = "front"
 
 -- in
-cable_input_red2 = colors.red
+cable_input_red2   = colors.red
 cable_input_green2 = colors.green
 
 -- out
@@ -125,7 +136,7 @@ while true do
 				debugPrint("Raising Red ...")
 				raise_state_red2 = true
 			end
-			-- react on active cable
+			-- react on active cable (signal instantly to red)
 			state_signal = false
 		else
 			if raise_state_red2 then
@@ -134,7 +145,6 @@ while true do
 			end
 		end
 		
-		-- react on falling edge
 		if colors.test(input_state, cable_input_green2) then
 			if not raise_state_green2 then
 				debugPrint("Raising Green ...")
@@ -145,7 +155,7 @@ while true do
 				debugPrint("Falling Green ...")
 				raise_state_green2 = false
 				
-				-- react on falling edge (toggle cable off)
+				-- react on falling edge (signal to green)
 				state_signal = true
 			end
 		end
