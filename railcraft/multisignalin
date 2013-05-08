@@ -51,28 +51,56 @@ cable_pulse_green1 = false
 
 used_old = nil
 
+state_old = { {}, {} }
+
 local function saveState()
-	f = fs.open("multi-"..tostring(os.getComputerID())..".state", "w")
+	-- has something changed?
+	if shallowcompare(state_old[1], state_signal) and shallowcompare(state_old[2], cable_state_switch2) then
+		return
+	end
+
+	f = fs.open("multi-"..tostring(os.getComputerID())..".state", "wb")
 	for i=1,#state_signal do
-		f.write(state_signal[i])
+		if state_signal[i] then
+			f.write(1)
+		else
+			f.write(0)
+		end
 	end
 	for i=1,#cable_state_switch2 do
-		f.write(cable_state_switch2[i])
+		if cable_state_switch2[i] then
+			f.write(1)
+		else
+			f.write(0)
+		end
 	end
 	f.close()
+	
+	state_old[1] = shallowcopy(state_signal)
+	state_old[2] = shallowcopy(cable_state_switch2)
 end
 
 local function restoreState()
-	f = fs.open("multi-"..tostring(os.getComputerID())..".state", "r")
+	f = fs.open("multi-"..tostring(os.getComputerID())..".state", "rb")
 	if f ~= nil then
 		for i=1,#state_signal do
-			state_signal[i] = f.read()
+			if f.read() == 1 then
+				state_signal[i] = true
+			else
+				state_signal[i] = false
+			end
 		end
 		for i=1,#cable_state_switch2 do
-			cable_state_switch2[i] = f.read()
+			if f.read() == 1 then
+				cable_state_switch2[i] = true
+			else
+				cable_state_switch2[i] = false
+			end
 		end
 		f.close()
 	end
+	state_old[1] = shallowcopy(state_signal)
+	state_old[2] = shallowcopy(cable_state_switch2)
 end
 
 local function calculateUsed()

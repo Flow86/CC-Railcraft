@@ -34,22 +34,40 @@ raise_state_green2 = false
 
 pulse_state_green1 = false
 
+state_old = {}
+
 -- end vars
 
 local function saveState()
-	f = fs.open("signal-"..tostring(os.getComputerID())..".state", "w")
+	-- has something changed?
+	if shallowcompare(state_old, state_signal) then
+		return
+	end
+
+	f = fs.open("signal-"..tostring(os.getComputerID())..".state", "wb")
 	if f ~= nil then
-		f.write(state_signal)
+		if state_signal then
+			f.write(1)
+		else
+			f.write(0)
+		end
 		f.close()
 	end
+	state_old = shallowcopy(state_signal)
 end
 
 local function restoreState()
-	f = fs.open("signal-"..tostring(os.getComputerID())..".state", "r")
+	f = fs.open("signal-"..tostring(os.getComputerID())..".state", "rb")
 	if f ~= nil then
-		state_signal = f.read()
+		if  f.read() == 1 then
+			state_signal = true
+			pulse_state_green1 = true
+		else
+			state_signal = false
+		end
 		f.close()
 	end
+	state_old = shallowcopy(state_signal)
 end
 
 local function printHeader()
@@ -78,17 +96,17 @@ local function updateState()
 		-- set state of lockdown track and light
 		setBundledState(cable_output, cable_output_track2, state_signal)
 		setBundledState(cable_output, cable_output_light2, not state_signal)
-		
-		-- send block state to previous block
-		if pulse_state_green1 then
-			debugPrint("Free Input")
-			
-			pulse_state_green1 = false
-			pulseBundledState(cable_output, cable_output_green1, true)
-		end
 	end
 	
 	state_signal_old = state_signal
+
+	-- send block state to previous block
+	if pulse_state_green1 then
+		debugPrint("Free Input")
+		
+		pulse_state_green1 = false
+		pulseBundledState(cable_output, cable_output_green1, true)
+	end
 end
 
 local function printState()
@@ -110,6 +128,7 @@ shell.run('debug.lua')
 shell.run('bundle.lua')
 
 setDebug(nil, 4)
+enableDebug()
 
 -- reset cable
 rs.setBundledOutput(cable_output, 0)
@@ -147,7 +166,7 @@ while true do
 
 		if colors.test(input_state, cable_input_red2) then
 			if not raise_state_red2 then
-				--debugPrint("Raising Red ...")
+				debugPrint("Raising Red ...")
 				raise_state_red2 = true
 				
 				debugPrint("Block occupied")
@@ -157,7 +176,7 @@ while true do
 			state_signal = false
 		else
 			if raise_state_red2 then
-				--debugPrint("Falling Red ...")
+				debugPrint("Falling Red ...")
 				raise_state_red2 = false
 				
 				debugPrint("Block freed")
@@ -169,12 +188,12 @@ while true do
 		
 		if colors.test(input_state, cable_input_green2) then
 			if not raise_state_green2 then
-				--debugPrint("Raising Green ...")
+				debugPrint("Raising Green ...")
 				raise_state_green2 = true
 			end
 		else
 			if raise_state_green2 then
-				--debugPrint("Falling Green ...")
+				debugPrint("Falling Green ...")
 				raise_state_green2 = false
 				
 				-- react on falling edge and not if red2 is active (signal to green)
