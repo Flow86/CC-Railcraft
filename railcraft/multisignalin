@@ -52,15 +52,25 @@ cable_pulse_green1 = false
 used_old = nil
 
 local function saveState()
-	f = fs.open("/signal"..tostring(os.getComputerID())..".state", "w")
-	--f.write(state_signal)
+	f = fs.open("multi-"..tostring(os.getComputerID())..".state", "w")
+	for i=1,#state_signal do
+		f.write(state_signal[i])
+	end
+	for i=1,#cable_state_switch2 do
+		f.write(cable_state_switch2[i])
+	end
 	f.close()
 end
 
 local function restoreState()
-	f = fs.open("/signal"..tostring(os.getComputerID())..".state", "r")
+	f = fs.open("multi-"..tostring(os.getComputerID())..".state", "r")
 	if f ~= nil then
-		--state_signal = f.readAll()
+		for i=1,#state_signal do
+			state_signal[i] = f.read()
+		end
+		for i=1,#cable_state_switch2 do
+			cable_state_switch2[i] = f.read()
+		end
 		f.close()
 	end
 end
@@ -91,6 +101,8 @@ local function printHeader()
 end
 
 local function updateState()
+	saveState()
+
 	for i=1,#state_signal do
 		-- send power to switch track
 		if cable_output_switch2[i] ~= nil then
