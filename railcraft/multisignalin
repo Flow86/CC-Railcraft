@@ -167,6 +167,44 @@ local function printState()
 	print("S #1: ", cable_state_switch2[1], "  #2: ", cable_state_switch2[2], "  #3: ", cable_state_switch2[3])
 end
 
+local function occupyBlock(i)
+	-- block marked as red
+	state_signal[i] = false
+
+	-- instantly activate switch-track
+	cable_state_switch2[i] = false
+end
+
+local function freeBlock(i)
+	debugPrint("Block #", i, " freed")
+
+	-- block marked as green
+	state_signal[i] = true
+
+	-- deactivate switch-track
+	cable_state_switch2[i] = true
+end
+
+local function freeOutputPath()
+	if not state_timer then
+		state_timer = true
+		os.startTimer(2)
+	
+		debugPrint("Output freed")
+	
+		-- path is now free
+		-- now activate one of the (used) 3 blocks
+	
+		local used, usedp = calculateUsed()
+		if used ~= 0 then
+			-- react on falling edge (path marked as green)
+			local free = math.random(1, used)
+			cable_pulse_green3[usedp[free]] = true
+			--debugPrint("Used: ", used, " freeing #", free, " => ", usedp[free])
+		end
+	end
+end
+
 -- end functions
 
 -- reset terminal
@@ -198,9 +236,24 @@ while true do
 			term.clear()
 			term.setCursorPos(1, 1)
 			break
-		end
-		if string.lower(param) == "d" then
+		elseif string.lower(param) == "d" then
 			toggleDebug()
+		elseif string.lower(param) == "1" then
+			occupyBlock(1)
+		elseif string.lower(param) == "2" then
+			occupyBlock(2)
+		elseif string.lower(param) == "3" then
+			occupyBlock(3)
+		elseif string.lower(param) == "!" then
+			freeBlock(1)
+		elseif string.lower(param) == "\"" then
+			freeBlock(2)
+		elseif string.lower(param) == "§" then
+			freeBlock(3)
+		elseif string.lower(param) == "g" then
+			freeOutputPath()
+		else
+			print("Unknown key: "..param)
 		end
 	end
 	
@@ -220,13 +273,9 @@ while true do
 					debugPrint("Block #", i, " occupied")
 				end
 
-				-- block is occupied now
+				-- react on active cable (block is occupied now)
+				occupyBlock(i)
 				
-				-- react on active cable (block marked as red)
-				state_signal[i] = false
-
-				-- instantly activate switch-track
-				cable_state_switch2[i] = false
 			else
 				if raise_state_red2[i] then
 					--debugPrint("Falling Red #", i, " ...")
@@ -244,15 +293,8 @@ while true do
 					--debugPrint("Falling Green #", i, " ...")
 					raise_state_green2[i] = false
 					
-					debugPrint("Block #", i, " freed")
-
-					-- block is now free
-					
-					-- react on falling edge (block marked as green)
-					state_signal[i] = true
-
-					-- deactivate switch-track
-					cable_state_switch2[i] = true
+					-- react on falling edge (block is now free)
+					freeBlock(i)
 				end
 			end
 		end
@@ -268,23 +310,7 @@ while true do
 				--debugPrint("Falling Out Green ...")
 				raise_state_green3 = false
 				
-				if not state_timer then
-					state_timer = true
-					os.startTimer(2)
-				
-					debugPrint("Output freed")
-
-					-- path is now free
-					-- now activate one of the (used) 3 blocks
-
-					local used, usedp = calculateUsed()
-					if used ~= 0 then
-						-- react on falling edge (path marked as green)
-						local free = math.random(1, used)
-						cable_pulse_green3[usedp[free]] = true
-						--debugPrint("Used: ", used, " freeing #", free, " => ", usedp[free])
-					end
-				end
+				freeOutputPath()
 			end
 		end
 	end

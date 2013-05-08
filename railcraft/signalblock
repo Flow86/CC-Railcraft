@@ -128,7 +128,7 @@ shell.run('debug.lua')
 shell.run('bundle.lua')
 
 setDebug(nil, 4)
-enableDebug()
+--enableDebug()
 
 -- reset cable
 rs.setBundledOutput(cable_output, 0)
