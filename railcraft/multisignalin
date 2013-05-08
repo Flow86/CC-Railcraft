@@ -2,48 +2,54 @@
 -- plug 4 different bundled cables in:
 --
 -- left, back, right are for the 3 parallel block controllers
---   pre-detector -> red
---   blue -> switch A/B, B/C
---   parallel block "lime" -> lime
---   parallel block "green" -> green
---   (simply connect bundled cable to each parallel block)
+--   pre-detector -> red, magenta, pink
+--   blue -> switch A/B
+--   lightBlue -> switch B/C
+--   purple -> switch C/X (unused)
+--   parallel block "red" -> green, cyan, yellow
+--   parallel block "green" -> gray, lightGray, white
 --
 -- front:
---   next block "lime" -> yellow
+--   next block "red" -> lime
 --   green -> previous block "green"
 --   red  -> previous block "red"
---   (simply connect bundled cable to previous block)
 --
 
 -- config
 
-cable_input =  { "left", "back", "right", "front" }
-cable_output = { "left", "back", "right", "front" }
+cable_input =  { "back", "back", "back", "front" }
+cable_output = { "back", "back", "back", "front" }
 
--- in
-cable_input_red2   = { colors.magenta,  colors.magenta,  colors.magenta, }
-cable_input_green2 = { colors.lime, colors.lime, colors.lime }
-cable_input_green3 = colors.yellow
+-- in (back)
+cable_input_red2   = { colors.red,  colors.magenta,  colors.pink, }
+cable_input_green2 = { colors.green, colors.cyan, colors.yellow }
 
--- out
-cable_output_green3  = { colors.green, colors.green, colors.green }
-cable_output_switch2 = { colors.blue,  colors.blue,  nil }
+-- in (front)
+cable_input_green3 = colors.lime
 
+-- out (back)
+cable_output_green3  = { colors.gray, colors.lightGray, colors.white }
+cable_output_switch2 = { colors.blue,  colors.lightBlue,  colors.purple }
+
+-- out (front)
 cable_output_green1 =  colors.green
 cable_output_red1   =  colors.red
 
 -- end config
 
-state_signal = { false, false, false }
+-- true=free, false=used
+state_signal = { true, true, true }
 
 raise_state_red2   = { false, false, false }
 raise_state_green2 = { false, false, false }
 raise_state_green3 = false
 
-cable_state_switch2 = { false, false, false }
+cable_state_switch2 = { true, true, true }
 cable_pulse_green3  = { false, false, false }
 cable_state_red1   = true
 cable_pulse_green1 = false
+
+used_old = nil
 
 local function saveState()
 	f = fs.open("/signal"..tostring(os.getComputerID())..".state", "w")
@@ -93,6 +99,7 @@ local function updateState()
 		
 		-- puls green to parallel block
 		if cable_pulse_green3[i] then
+			debugPrint("Free Block #", i)
 			cable_pulse_green3[i] = false
 			pulseBundledState(cable_output[i], cable_output_green3[i], true)
 		end
@@ -103,6 +110,7 @@ local function updateState()
 
 	-- pulse green to previous block
 	if cable_pulse_green1 then
+		debugPrint("Free Input")
 		cable_pulse_green1 = false
 		pulseBundledState(cable_output[4], cable_output_green1, true)
 	end
@@ -111,7 +119,7 @@ end
 local function printState()
 	term.setCursorPos(1, 2)
 	used, usedp = calculateUsed()
-	print("Free Tracks: ", used)
+	print("Free Tracks: ", (#state_signal)-used)
 
 	term.clearLine(4)
 	print("T #1: ", state_signal[1], "  #2: ", state_signal[2], "  #3: ", state_signal[3])
@@ -127,7 +135,7 @@ term.clear()
 shell.run('debug.lua')
 shell.run('bundle.lua')
 
-setDebug("top", 1)
+setDebug("right", 1)
 enableDebug()
 
 -- reset cable
@@ -156,58 +164,55 @@ while true do
 		end
 	end
 	
+	if event == "timer" then
+		state_timer = false
+	end
+	
 	if event == "redstone" then
 		for i=1,#state_signal do
 			local input_state = rs.getBundledInput(cable_input[i])
 			
 			if colors.test(input_state, cable_input_red2[i]) then
 				if not raise_state_red2[i] then
-					debugPrint("Raising Red #", i, " ...")
+					--debugPrint("Raising Red #", i, " ...")
 					raise_state_red2[i] = true
+					
+					debugPrint("Block #", i, " occupied")
 				end
-				
+
 				-- block is occupied now
 				
 				-- react on active cable (block marked as red)
 				state_signal[i] = false
-				
-				used, usedp = calculateUsed()
-				if used == 0 then
-					cable_state_red1 = true
-				end
-				
+
 				-- instantly activate switch-track
-				cable_state_switch2[i] = true
+				cable_state_switch2[i] = false
 			else
 				if raise_state_red2[i] then
-					debugPrint("Falling Red #", i, " ...")
+					--debugPrint("Falling Red #", i, " ...")
 					raise_state_red2[i] = false
 				end
 			end
 		
 			if colors.test(input_state, cable_input_green2[i]) then
 				if not raise_state_green2[i] then
-					debugPrint("Raising Green #", i, " ...")
+					--debugPrint("Raising Green #", i, " ...")
 					raise_state_green2[i] = true
 				end
 			else
 				if raise_state_green2[i] then
-					debugPrint("Falling Green #", i, " ...")
+					--debugPrint("Falling Green #", i, " ...")
 					raise_state_green2[i] = false
 					
+					debugPrint("Block #", i, " freed")
+
 					-- block is now free
 					
 					-- react on falling edge (block marked as green)
 					state_signal[i] = true
 
-					used, usedp = calculateUsed()
-					if used ~= 0 then
-						cable_state_red1 = false
-						cable_pulse_green1 = true
-					end
-					
 					-- deactivate switch-track
-					cable_state_switch2[i] = false
+					cable_state_switch2[i] = true
 				end
 			end
 		end
@@ -215,23 +220,51 @@ while true do
 		local input_state = rs.getBundledInput(cable_input[4])
 		if colors.test(input_state, cable_input_green3) then
 			if not raise_state_green3 then
-				debugPrint("Raising Out Green ...")
+				--debugPrint("Raising Out Green ...")
 				raise_state_green3 = true
 			end
 		else
 			if raise_state_green3 then
-				debugPrint("Falling Out Green ...")
+				--debugPrint("Falling Out Green ...")
 				raise_state_green3 = false
 				
-				-- path is now free
-				-- now activate one of the (used) 3 blocks
+				if not state_timer then
+					state_timer = true
+					os.startTimer(2)
+				
+					debugPrint("Output freed")
 
-				local used, usedp = calculateUsed()
-				if used ~= 0 then
-					-- react on falling edge (path marked as green)
-					cable_pulse_green3[usedp[math.random(1, used)]] = true
+					-- path is now free
+					-- now activate one of the (used) 3 blocks
+
+					local used, usedp = calculateUsed()
+					if used ~= 0 then
+						-- react on falling edge (path marked as green)
+						local free = math.random(1, used)
+						cable_pulse_green3[usedp[free]] = true
+						--debugPrint("Used: ", used, " freeing #", free, " => ", usedp[free])
+					end
 				end
 			end
+		end
+	end
+	
+	local pathToParallelUsed = false
+	for i=1,#state_signal do
+		if raise_state_red2[i] then
+			pathToParallelUsed = true
+		end
+	end
+	
+	local used, usedp = calculateUsed()
+	if used == #state_signal or pathToParallelUsed then
+		cable_state_red1 = true
+		used_old = nil
+	else
+		cable_state_red1 = false
+		if used_old == nil or used_old ~= used then
+			cable_pulse_green1 = true
+			used_old = used
 		end
 	end
 	

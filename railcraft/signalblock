@@ -32,11 +32,12 @@ state_signal_old = nil
 raise_state_red2 = false
 raise_state_green2 = false
 
+pulse_state_green1 = false
+
 -- end vars
 
 local function saveState()
-	f = fs.open("/signal-"..tostring(os.getComputerID())..".state", "w")
-	debugPrint(f)
+	f = fs.open("signal-"..tostring(os.getComputerID())..".state", "w")
 	if f ~= nil then
 		f.write(state_signal)
 		f.close()
@@ -44,9 +45,9 @@ local function saveState()
 end
 
 local function restoreState()
-	f = fs.open("/signal-"..tostring(os.getComputerID())..".state", "r")
+	f = fs.open("signal-"..tostring(os.getComputerID())..".state", "r")
 	if f ~= nil then
-		state_signal = f.readAll()
+		state_signal = f.read()
 		f.close()
 	end
 end
@@ -79,7 +80,10 @@ local function updateState()
 		setBundledState(cable_output, cable_output_light2, not state_signal)
 		
 		-- send block state to previous block
-		if state_signal then
+		if pulse_state_green1 then
+			debugPrint("Free Input")
+			
+			pulse_state_green1 = false
 			pulseBundledState(cable_output, cable_output_green1, true)
 		end
 	end
@@ -129,6 +133,13 @@ while true do
 		if string.lower(param) == "d" then
 			toggleDebug()
 		end
+		if string.lower(param) == "r" then
+			state_signal = false
+		end
+		if string.lower(param) == "g" then
+			state_signal = true
+			pulse_state_green1 = true
+		end
 	end
 	
 	if event == "redstone" then
@@ -136,30 +147,40 @@ while true do
 
 		if colors.test(input_state, cable_input_red2) then
 			if not raise_state_red2 then
-				debugPrint("Raising Red ...")
+				--debugPrint("Raising Red ...")
 				raise_state_red2 = true
+				
+				debugPrint("Block occupied")
 			end
+			
 			-- react on active cable (signal instantly to red)
 			state_signal = false
 		else
 			if raise_state_red2 then
-				debugPrint("Falling Red ...")
+				--debugPrint("Falling Red ...")
 				raise_state_red2 = false
+				
+				debugPrint("Block freed")
+
+				-- react on falling edge (previous block to green)
+				pulse_state_green1 = true
 			end
 		end
 		
 		if colors.test(input_state, cable_input_green2) then
 			if not raise_state_green2 then
-				debugPrint("Raising Green ...")
+				--debugPrint("Raising Green ...")
 				raise_state_green2 = true
 			end
 		else
 			if raise_state_green2 then
-				debugPrint("Falling Green ...")
+				--debugPrint("Falling Green ...")
 				raise_state_green2 = false
 				
-				-- react on falling edge (signal to green)
-				state_signal = true
+				-- react on falling edge and not if red2 is active (signal to green)
+				if not raise_state_red2 then
+					state_signal = true
+				end
 			end
 		end
 	end

@@ -59,6 +59,7 @@ function debugPrint(text, ... )
 	end
 	
 	term.setCursorPos(1, debug_ystart+debug_lines)
+	term.clearLine(debug_lines)
 	print(nr, " ", text, ...)
 	term.clearLine(debug_lines + 1)
 	
